@@ -74,6 +74,19 @@ namespace StarterAssets
 
 		private const float _threshold = 0.01f;
 
+		[Header("Grapple Hook")]
+		//How far the grapple hook can reach; the max distance at which it will connect
+		public int grappleHookLength;
+		//The speed the player will be pulled in during grapple
+		public float pullinSpeed;
+		public GameObject hook;
+
+		private bool grappleHookInUse;
+		private bool stuckToTheWall;
+		//The direction the player was facing when they activated the hook
+		private Vector3 grappleDirection;
+		private Vector3 grappleTarget;
+
 		private bool IsCurrentDeviceMouse
 		{
 			get
@@ -97,6 +110,7 @@ namespace StarterAssets
 
 		private void Start()
 		{
+			stuckToTheWall = false;
 			_controller = GetComponent<CharacterController>();
 			_input = GetComponent<StarterAssetsInputs>();
 #if ENABLE_INPUT_SYSTEM && STARTER_ASSETS_PACKAGES_CHECKED
@@ -109,9 +123,9 @@ namespace StarterAssets
 			_jumpTimeoutDelta = JumpTimeout;
 			_fallTimeoutDelta = FallTimeout;
 		}
-
 		private void Update()
 		{
+			PlayerGrapple();
 			JumpAndGravity();
 			GroundedCheck();
 			Move();
@@ -195,12 +209,15 @@ namespace StarterAssets
 			}
 
 			// move the player
-			_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+			if (!stuckToTheWall)
+			{
+				_controller.Move(inputDirection.normalized * (_speed * Time.deltaTime) + new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
+			}
 		}
 
 		private void JumpAndGravity()
 		{
-			if (Grounded)
+			if (Grounded&&!stuckToTheWall)
 			{
 				// reset the fall timeout timer
 				_fallTimeoutDelta = FallTimeout;
@@ -240,10 +257,63 @@ namespace StarterAssets
 			}
 
 			// apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
-			if (_verticalVelocity < _terminalVelocity)
+			if (_verticalVelocity < _terminalVelocity&&!stuckToTheWall)
 			{
 				_verticalVelocity += Gravity * Time.deltaTime;
 			}
+            else if(stuckToTheWall){
+				_verticalVelocity = 0.0f;
+            }
+		}
+
+		private void PlayerGrapple()
+        {
+			//If middle mouse button down and the hook isnt already being used
+			if (_input.grapple && !grappleHookInUse)
+			{
+				//sets the direction to move to the direction the player was facing when they shot the hook
+
+				//Physics.Raycast returns a boolean representing whether or not a ray collided, starting at transform.position, moving in direction transform.forward, returning false if no collisions within grappleHookLength
+				//Essentially checks if there is a surface to grapple to from where the player is facing
+				if (!Physics.Raycast(GameObject.FindWithTag("MainCamera").transform.position, GameObject.FindWithTag("MainCamera").transform.forward, out RaycastHit hitInfo, grappleHookLength))
+				{
+					//If there is no surface to grapple, this allows the player to try to grapple again
+					grappleHookInUse = false;
+				}
+                else
+                {
+					//If there is a valid surface to grapple, this prevents the player from grappling again and sets up for them to move towards the end of the hook
+					grappleHookInUse = true;
+					stuckToTheWall = true;
+					//grabs where the point to move towards is
+					grappleTarget = hitInfo.point;
+					//gets the direction of the target
+					grappleDirection = grappleTarget - transform.position;
+					GameObject temp = Instantiate(hook, hitInfo.point, transform.rotation);
+				}
+			}
+
+			//If there is a surface to grapple
+			if (grappleHookInUse)
+			{
+				//Move player towards the end of the grapple hook
+				_controller.Move(grappleDirection.normalized*Time.deltaTime*pullinSpeed);
+				if(Vector3.Distance(transform.position, grappleTarget) < 1f)
+                {
+					grappleHookInUse=false;
+					stuckToTheWall = true;
+                }
+			}
+			
+			//If the player presses space, they can cancel their hook
+            if (_input.jump)
+            {
+				grappleHookInUse = false;
+				stuckToTheWall=false;
+            }
+
+			//Sets whether the player is pressing the middle mouse button to false
+			_input.grapple = false;
 		}
 
 		private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
@@ -264,5 +334,5 @@ namespace StarterAssets
 			// when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
 			Gizmos.DrawSphere(new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z), GroundedRadius);
 		}
-	}
+    }
 }

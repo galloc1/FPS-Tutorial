@@ -14,7 +14,6 @@ namespace StarterAssets
 		public bool sprint;
 		public bool fire;
 		public bool grapple;
-		public bool grappleHookInUse;
 
 		[Header("Movement Settings")]
 		public bool analogMovement;
@@ -53,7 +52,6 @@ namespace StarterAssets
 		public void OnGrapple(InputValue value)
         {
 			GrappleInput(value.isPressed);
-			grappleHookInUse = true;
         }
 #endif
 
