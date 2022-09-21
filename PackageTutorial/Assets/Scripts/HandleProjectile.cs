@@ -13,6 +13,7 @@ public class HandleProjectile : MonoBehaviour
     void Start()
     {
         timer = 0;
+        Time.timeScale = 0.25f;
     }
 
     // Update is called once per frame
@@ -21,11 +22,13 @@ public class HandleProjectile : MonoBehaviour
         timer += Time.deltaTime;
         if(timer >= projectileLife)
         {
+            Time.timeScale = 1f;
             Destroy(gameObject);
         }
     }
     private void OnCollisionEnter(Collision collision)
     {
+        Time.timeScale = 1f;
         Destroy(gameObject);
     }
 }

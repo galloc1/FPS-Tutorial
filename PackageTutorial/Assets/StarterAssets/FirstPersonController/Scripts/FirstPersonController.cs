@@ -57,7 +57,7 @@ namespace StarterAssets
 		// player
 		private float _speed;
 		private float _rotationVelocity;
-		private float _verticalVelocity;
+		public float _verticalVelocity;
 		private float _terminalVelocity = 53.0f;
 
 		// timeout deltatime
@@ -81,11 +81,15 @@ namespace StarterAssets
 		public float pullinSpeed;
 		public GameObject hook;
 
-		private bool grappleHookInUse;
-		private bool stuckToTheWall;
+		public bool grappleHookInUse;
+		public bool stuckToTheWall;
+		public float _xVelocity;
+		public float _zVelocity;
 		//The direction the player was facing when they activated the hook
-		private Vector3 grappleDirection;
-		private Vector3 grappleTarget;
+		public Vector3 grappleDirection;
+		public Vector3 grappleTarget;
+
+		private GameObject temp;
 
 		private bool IsCurrentDeviceMouse
 		{
@@ -202,10 +206,11 @@ namespace StarterAssets
 
 			// note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
 			// if there is a move input rotate player when the player is moving
-			if (_input.move != Vector2.zero)
+			if (_input.move != Vector2.zero&&!grappleHookInUse)
 			{
 				// move
-				inputDirection = transform.right * _input.move.x + transform.forward * _input.move.y;
+				_zVelocity += _input.move.x;
+				inputDirection = transform.right * _zVelocity + transform.forward * _input.move.y;
 			}
 
 			// move the player
@@ -217,7 +222,7 @@ namespace StarterAssets
 
 		private void JumpAndGravity()
 		{
-			if (Grounded&&!stuckToTheWall)
+			if (!grappleHookInUse&&Grounded||stuckToTheWall)
 			{
 				// reset the fall timeout timer
 				_fallTimeoutDelta = FallTimeout;
@@ -257,13 +262,10 @@ namespace StarterAssets
 			}
 
 			// apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
-			if (_verticalVelocity < _terminalVelocity&&!stuckToTheWall)
+			if (_verticalVelocity < _terminalVelocity&&!stuckToTheWall&&!grappleHookInUse)
 			{
 				_verticalVelocity += Gravity * Time.deltaTime;
 			}
-            else if(stuckToTheWall){
-				_verticalVelocity = 0.0f;
-            }
 		}
 
 		private void PlayerGrapple()
@@ -282,14 +284,15 @@ namespace StarterAssets
 				}
                 else
                 {
+					_verticalVelocity = 0f;
 					//If there is a valid surface to grapple, this prevents the player from grappling again and sets up for them to move towards the end of the hook
 					grappleHookInUse = true;
-					stuckToTheWall = true;
+					stuckToTheWall = false;
 					//grabs where the point to move towards is
 					grappleTarget = hitInfo.point;
 					//gets the direction of the target
-					grappleDirection = grappleTarget - transform.position;
-					GameObject temp = Instantiate(hook, hitInfo.point, transform.rotation);
+					grappleDirection = grappleTarget-transform.position;
+					temp = Instantiate(hook, hitInfo.point, transform.rotation);
 				}
 			}
 
@@ -297,19 +300,32 @@ namespace StarterAssets
 			if (grappleHookInUse)
 			{
 				//Move player towards the end of the grapple hook
-				_controller.Move(grappleDirection.normalized*Time.deltaTime*pullinSpeed);
-				if(Vector3.Distance(transform.position, grappleTarget) < 1f)
+				_controller.Move(grappleDirection.normalized * pullinSpeed *Time.deltaTime);
+				if (Vector3.Distance(transform.position, grappleTarget) < 1f)
                 {
 					grappleHookInUse=false;
 					stuckToTheWall = true;
+					_verticalVelocity = 0f;
                 }
 			}
-			
+            			
 			//If the player presses space, they can cancel their hook
             if (_input.jump)
             {
+				if (!stuckToTheWall&&grappleHookInUse)
+				{
+					_verticalVelocity = grappleDirection.normalized.y * pullinSpeed;
+					_xVelocity = grappleDirection.normalized.x * pullinSpeed;
+					_zVelocity = grappleDirection.normalized.z * pullinSpeed;
+				}
 				grappleHookInUse = false;
 				stuckToTheWall=false;
+				Destroy(temp);
+            }
+            if (Grounded)
+            {
+				_xVelocity = 0;
+				_zVelocity = 0;
             }
 
 			//Sets whether the player is pressing the middle mouse button to false
